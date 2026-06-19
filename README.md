@@ -15,7 +15,7 @@ EventHorizon utilizes an unsupervised machine learning pipeline to process finan
 ### Core Components
 
 - **Dimensionality Reduction:** Principal Component Analysis (PCA) compresses fast-twitch OHLCV structural features.
-- **Regime Detection:** Gaussian Hidden Markov Models (HMM) utilize the Expectation-Maximization (EM) algorithm to classify distinct market environments (e.g., Bull, Bear, High-Volatility Shock).
+- **Regime Detection:** Student-t Hidden Markov Models (HMM) utilize the Expectation-Maximization (EM) algorithm to classify distinct market environments (e.g., Bull, Bear, High-Volatility Shock) while robustly modeling fat-tailed extreme outliers.
 - **Policy Routing:** A Temperature-Scaled Softmax engine translates HMM state probabilities into continuous, dynamically scaled portfolio weights.
 - **Orchestration:** A Python/FastAPI backend serves the quantitative engine, while a Vite/React frontend dashboard provides out-of-sample analytics and visualization.
 
@@ -172,7 +172,7 @@ Feature Engineering
 Principal Component Analysis (PCA)
           │
           ▼
-Gaussian Hidden Markov Model (HMM)
+Student-t Hidden Markov Model (HMM)
           │
           ▼
 State Probabilities
