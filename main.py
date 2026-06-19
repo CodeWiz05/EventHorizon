@@ -119,12 +119,21 @@ def main():
         optimizer = PolicyOptimizer(train_df=train_regime_df, risk_profile=risk_profile, shock_label=dynamic_shock_label, asset_class=engineer.asset_class)
         optimal_weights = optimizer.calibrate_weights()
 
-        engine = RegimePolicyEngine(test_df=test_regime_df, optimal_weights=optimal_weights, tpm = optimal_engine.optimal_model.transmat_)
+        engine = RegimePolicyEngine(test_df=test_regime_df, optimal_weights=optimal_weights, tpm=optimal_engine.optimal_model.transmat_)
         test_results_df = engine.generate_signals()
 
-        # APPLY TRANSACTION COSTS (10 bps / 0.1% fee on exposure delta)
+        # APPLY INSTITUTIONAL TRANSACTION COSTS
+        fee_map = {
+            "CRYPTO": 0.0015,                      # 15 bps (Spread + Exchange fee)
+            "EQUITY": 0.0005,                      # 5 bps (Slippage)
+            "COMMODITY_PRECIOUS_METAL": 0.0003,    # 3 bps (Futures execution)
+            "FIXED_INCOME": 0.0002,                # 2 bps (Highly liquid Treasury markets)
+            "FX": 0.0001                           # 1 bps (Interbank spread)
+        }
+        bps_fee = fee_map.get(engineer.asset_class, 0.001)
+        
         exposure_change = test_results_df['Target_Exposure'].diff().abs().fillna(0)
-        t_costs = exposure_change * 0.001
+        t_costs = exposure_change * bps_fee
         
         strat_returns = (test_results_df['Target_Exposure'].shift(1) * test_results_df['Log_Return']) - t_costs
         bh_returns = test_results_df['Log_Return']

@@ -22,49 +22,10 @@ class MarketDataEngineer:
         df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
         return df
 
-    def _engineer_macro_fear_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Original features: Highly predictive for Gold and Bonds"""
-        df['Rolling_Mean_21d'] = df['Log_Return'].rolling(window=21).mean()
-        
-        def get_slope(y):
-            x = np.arange(len(y))
-            return np.polyfit(x, y, 1)[0]
-        df['Rolling_Slope_63d'] = df['Close'].rolling(window=63).apply(get_slope, raw=True)
-        
-        df['Vol_21d'] = df['Log_Return'].rolling(window=21).std()
-        df['Vol_63d'] = df['Log_Return'].rolling(window=63).std()
-        df['Vol_126d'] = df['Log_Return'].rolling(window=126).std()
-        df['Vol_Struct_21_126'] = df['Vol_21d'] / df['Vol_126d'].replace(0, np.nan)
-        
-        rolling_peak_21d = df['Close'].rolling(window=21).max()
-        df['Max_DD_21d'] = (df['Close'] / rolling_peak_21d) - 1
-        df['Sign_Persistence_21d'] = (df['Log_Return'] > 0).rolling(window=21).mean()
-
-        self.feature_names = [
-            'Rolling_Mean_21d', 'Rolling_Slope_63d', 'Vol_21d', 'Vol_63d', 
-            'Vol_Struct_21_126', 'Max_DD_21d', 'Sign_Persistence_21d'
-        ]
-        return df
-
     def _engineer_equity_distribution_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Fast-Twitch distribution features designed to capture V-shaped recoveries 
-        and institutional distribution without lagging structural trends.
-        """
-        # 1. EWMA Volatility (Replaces Vol_21d)
-        # Reacts immediately to spikes, but decays the "memory" of a crash rapidly
         df['Vol_EWMA_10d'] = df['Log_Return'].ewm(span=10, adjust=False).std()
-        
-        # 2. Volatility Rate of Change
-        # Allows HMM to differentiate between "Crash" (High + Rising Vol) 
-        # and "Recovery" (High + Falling Vol)
         df['Vol_Change'] = df['Vol_EWMA_10d'].diff()
-        
-        # 3. Short-Term Momentum
-        # Catches the exact inflection point of a V-shape recovery
         df['Momentum_5d'] = df['Log_Return'].rolling(window=5).mean()
-        
-        # 4. Structural Anchors (Retained)
         df['Skew_21d'] = df['Log_Return'].rolling(window=21).skew()
         df['Trend_Distance_63d'] = df['Close'] / df['Close'].rolling(window=63).mean() - 1
 
@@ -74,13 +35,59 @@ class MarketDataEngineer:
         ]
         return df
 
+    def _engineer_fx_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss.replace(0, np.nan)
+        df['RSI_14d'] = 100 - (100 / (1 + rs))
+
+        roll_mean = df['Close'].rolling(window=21).mean()
+        roll_std = df['Close'].rolling(window=21).std()
+        df['BB_Width_21d'] = (roll_std * 2) / roll_mean
+
+        df['Dist_MA_63d'] = (df['Close'] / df['Close'].rolling(window=63).mean()) - 1.0
+
+        df['Autocorr_5d'] = df['Log_Return'].rolling(window=21).apply(
+            lambda x: pd.Series(x).autocorr(lag=1) if len(pd.Series(x).dropna()) > 1 else np.nan
+        )
+
+        self.feature_names = ['RSI_14d', 'BB_Width_21d', 'Dist_MA_63d', 'Autocorr_5d']
+        return df
+
+    def _engineer_safe_haven_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        def get_slope(y):
+            y_series = pd.Series(y).dropna()
+            x = np.arange(len(y_series))
+            if len(x) < 2: return np.nan
+            return np.polyfit(x, y_series, 1)[0]
+            
+        df['Macro_Slope_126d'] = df['Close'].rolling(window=126).apply(get_slope, raw=True)
+
+        df['Vol_21d'] = df['Log_Return'].rolling(window=21).std()
+        df['Vol_252d'] = df['Log_Return'].rolling(window=252).std()
+        df['Vol_Ratio'] = df['Vol_21d'] / df['Vol_252d'].replace(0, np.nan)
+
+        negative_returns = df['Log_Return'].copy()
+        negative_returns[negative_returns > 0] = 0
+        df['Downside_Dev_21d'] = negative_returns.rolling(window=21).std()
+
+        df['Max_DD_63d'] = (df['Close'] / df['Close'].rolling(window=63).max()) - 1.0
+
+        self.feature_names = ['Macro_Slope_126d', 'Vol_Ratio', 'Downside_Dev_21d', 'Max_DD_63d']
+        return df
+
     def engineer_structural_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df['Log_Return'] = np.log(df['Close'] / df['Close'].shift(1))
         
-        if self.context['behavior'] == 'pro-cyclical':
+        behavior = self.context.get('behavior', 'pro-cyclical')
+        
+        if behavior == 'pro-cyclical':
             return self._engineer_equity_distribution_features(df)
+        elif behavior == 'mean-reverting':
+            return self._engineer_fx_features(df)
         else:
-            return self._engineer_macro_fear_features(df)
+            return self._engineer_safe_haven_features(df)
 
     def run_pipeline(self) -> pd.DataFrame:
         raw_df = self.fetch_data()

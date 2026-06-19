@@ -35,14 +35,26 @@ class PolicyOptimizer:
             max_exposure = 1.0
 
         # 2. Dimensionally Consistent, Duration-Weighted Scoring
+        # 2. Asset-Class Aware, Duration-Weighted Scoring
         scores = {}
         for regime, row in self.risk_profile.iterrows():
-            # Fix 1: Dimensional Consistency (Sharpe scaled by absolute tail risk)
-            base_score = row['Sharpe'] / (1.0 + abs(row['Max_Drawdown']) + abs(row['CVaR_95']))
             
-            # Fix 2: Duration Weighting (Log scale penalizes short noise regimes)
+            # ROUTING LOGIC: Different assets require different objective functions
+            if self.asset_class == "FX":
+                # Mean-reverting: High directional return often means exhaustion.
+                # Reward low volatility and stability (carry-trade environments).
+                base_score = 1.0 / (1.0 + abs(row['Ann_Return']) + abs(row['Ann_Vol']))
+                
+            elif self.asset_class in ["FIXED_INCOME", "COMMODITY_PRECIOUS_METAL"]:
+                # Counter-cyclical safe havens: Deeply penalize drawdowns over pure return.
+                base_score = (row['Sharpe'] + 1.0) / (1.0 + (abs(row['Max_Drawdown']) * 2.0))
+                
+            else: 
+                # Pro-cyclical (Equity/Crypto): Reward momentum and risk-adjusted return.
+                base_score = row['Sharpe'] / (1.0 + abs(row['Max_Drawdown']) + abs(row['CVaR_95']))
+            
+            # Duration Weighting (Log scale penalizes short noise regimes)
             duration_multiplier = np.log(max(row['Mean_Duration_Days'], 2))
-            
             raw_score = base_score * duration_multiplier
             
             # Fix 3: Soften Shock State (No hardcoded 1.0 or 0.0)
@@ -53,7 +65,6 @@ class PolicyOptimizer:
                     raw_score = -abs(raw_score) * 2.0 # Deeply penalize for risk assets
             
             scores[regime] = raw_score
-
         # 3. Temperature-Scaled Softmax Allocation
         regimes = list(scores.keys())
         score_values = np.array([scores[r] for r in regimes])
