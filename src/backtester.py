@@ -14,23 +14,23 @@ class PolicyOptimizer:
         
         # 1. Asset-Specific Constraints & Temperature (Sharpness)
         if self.asset_class == "CRYPTO":
-            sharpness = 4.0      # Highly aggressive (Winner-takes-all) to avoid chop
+            sharpness = 1.2      # Reduced from 4.0 to prevent binary collapse
             is_safe_haven = False
             max_exposure = 1.0
         elif self.asset_class == "FX":
-            sharpness = 1.5      # Smooth blending for mean-reverting markets
+            sharpness = 0.8      # Reduced from 1.5
             is_safe_haven = False
             max_exposure = 0.5
         elif self.asset_class == "COMMODITY_PRECIOUS_METAL":
-            sharpness = 2.5      
+            sharpness = 1.0      # Reduced from 2.5
             is_safe_haven = True
             max_exposure = 1.0
         elif self.asset_class == "FIXED_INCOME":
-            sharpness = 2.0      
+            sharpness = 1.0      # Reduced from 2.0
             is_safe_haven = True
             max_exposure = 0.8
         else: # EQUITY
-            sharpness = 3.0      # Strong conviction, but not binary
+            sharpness = 1.1      # Reduced from 3.0 to allow blended exposure
             is_safe_haven = False
             max_exposure = 1.0
 

@@ -7,6 +7,7 @@ import pandas as pd
 import datetime
 import subprocess
 import yfinance as yf
+import asyncio
 from scipy.spatial import distance
 from src.data_engineering import MarketDataEngineer
 
@@ -22,10 +23,20 @@ app.add_middleware(
 )
 model_cache = {}
 
-def run_training_script():
+async def run_training_script():
     print("🚀 MLOPS: Starting background retraining job...")
-    subprocess.run(["python", "main.py"])
-    print("✅ MLOPS: Retraining complete.")
+    process = await asyncio.create_subprocess_exec(
+        "python", "main.py",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    
+    stdout, stderr = await process.communicate()
+    
+    if process.returncode == 0:
+        print("✅ MLOPS: Retraining complete. Artifacts updated.")
+    else:
+        print(f"❌ MLOPS: Retraining failed.\n{stderr.decode()}")
 
 def get_latest_artifact(ticker: str):
     safe_ticker = ticker.replace("^", "").replace("=", "_")

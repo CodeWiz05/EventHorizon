@@ -46,7 +46,7 @@ def run_causal_walk_forward(X_train, X_test, train_outliers, test_outliers, glob
         model = StudentTHMM(n_components=global_n_states, df=5.0, n_iter=1000, random_state=42, tol=1e-3)
         model.fit(X_clean_exp)
         
-        dist_matrix = cdist(model.means_, train_means, metric='euclidean')
+        dist_matrix = cdist(model.means_, train_means, metric='cosine')
         new_indices, original_indices = linear_sum_assignment(dist_matrix)
         state_mapping = {new_idx: orig_idx for new_idx, orig_idx in zip(new_indices, original_indices)}
         
