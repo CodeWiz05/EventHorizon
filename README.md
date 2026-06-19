@@ -219,7 +219,7 @@ This architecture more closely approximates real-world deployment conditions.
 
 ### Computational Overhead
 
-The Gaussian HMM training procedure relies on the Expectation-Maximization (EM) algorithm implemented through `hmmlearn`.
+The Student-t HMM training procedure relies on the Expectation-Maximization (EM) algorithm implemented through hmmlearn.
 
 Current limitations include:
 
