@@ -1,0 +1,28 @@
+# Python Environments & Cache
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Generated MLOps Artifacts & Data (DO NOT UPLOAD)
+api_models/
+backtests/
+*.joblib
+*.csv
+*.pkl
+
+# Node/React Dependencies
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+yarn-error.log*
+
+# Environment Variables & Secrets
+.env
+.env.local
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
